@@ -1,12 +1,13 @@
 import email
+import email.policy
+import email.utils
 import html
 import imaplib
 import os
 import re
 from datetime import datetime, timedelta
-from email import policy
 from email.message import EmailMessage
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from .utils import LogLevel, Verbosity, get_mailing_list_name, log
 
@@ -222,9 +223,16 @@ def sync_mailing_list(
 
         # Now process all cached messages into the final archive
         # We only process the UIDs that were found in the search
-        output_file = os.path.join(dest_folder, f"{wg_name}-mailing-list.txt")
-        process_cache(cache_dir, output_file, [u.decode() for u in uids], verbose)
-        return [output_file]
+        yearly_archives = process_cache(
+            cache_dir, [u.decode() for u in uids], verbose
+        )
+        updated_files = []
+        for year, content in yearly_archives.items():
+            output_file = os.path.join(dest_folder, f"{wg_name}-mail-archive-{year}.txt")
+            with open(output_file, "w", encoding="utf-8") as out_fh:
+                out_fh.write(content)
+            updated_files.append(output_file)
+        return updated_files
 
     except (imaplib.IMAP4.error, OSError) as err:
         log(f"IMAP Error: {err}", verbose, level=LogLevel.ERROR)
@@ -233,13 +241,12 @@ def sync_mailing_list(
 
 def process_cache(
     cache_dir: str,
-    output_file: str,
     uids: Optional[List[str]] = None,
     verbose: Verbosity = Verbosity.STATUS,
-) -> None:
-    """Process cached .eml files and write cleaned text to output_file."""
+) -> Dict[int, str]:
+    """Process cached .eml files and return cleaned text grouped by year."""
     log(
-        f"Generating mailing list archive: {output_file}...",
+        "Processing cached messages...",
         verbose,
         level=LogLevel.STATUS,
     )
@@ -252,38 +259,60 @@ def process_cache(
         # Sort them numerically by UID
         eml_files.sort(key=lambda x: int(x.split(".")[0]))
 
+    yearly_content: Dict[int, List[str]] = {}
     count = 0
-    with open(output_file, "w", encoding="utf-8") as out_fh:
-        for eml_file in eml_files:
-            cache_path = os.path.join(cache_dir, eml_file)
-            if not os.path.exists(cache_path):
-                continue
 
-            with open(cache_path, "rb") as file_handle:
-                msg = email.message_from_binary_file(file_handle, policy=policy.default)
+    for eml_file in eml_files:
+        cache_path = os.path.join(cache_dir, eml_file)
+        if not os.path.exists(cache_path):
+            continue
 
-            subject = msg.get("Subject", "(No Subject)")
-            from_addr = msg.get("From", "(Unknown Sender)")
-            date_val = msg.get("Date", "(Unknown Date)")
+        with open(cache_path, "rb") as file_handle:
+            msg = email.message_from_binary_file(file_handle, policy=email.policy.default)
 
-            raw_body = extract_text_content(msg)
-            cleaned_body = clean_email_text(raw_body)
+        # Extract Year from Date header
+        date_header = msg.get("Date")
+        year = None
+        if date_header:
+            try:
+                date_dt = email.utils.parsedate_to_datetime(str(date_header))
+                year = date_dt.year
+            except (ValueError, TypeError, IndexError):
+                pass
 
-            if not cleaned_body and subject == "(No Subject)":
-                continue
+        if year is None:
+            continue
 
-            out_fh.write(f"Date: {date_val}\n")
-            out_fh.write(f"From: {from_addr}\n")
-            out_fh.write(f"Subject: {subject}\n\n")
-            out_fh.write(cleaned_body + "\n\n")
-            out_fh.write("=" * 80 + "\n\n")
+        if year not in yearly_content:
+            yearly_content[year] = []
 
-            count += 1
-            if count % 100 == 0:
-                log(f"Processed {count} messages...", verbose, level=LogLevel.PROGRESS)
+        subject = msg.get("Subject", "(No Subject)")
+        from_addr = msg.get("From", "(Unknown Sender)")
+        date_val = msg.get("Date", "(Unknown Date)")
+
+        raw_body = extract_text_content(msg)
+        cleaned_body = clean_email_text(raw_body)
+
+        if not cleaned_body and subject == "(No Subject)":
+            continue
+
+        message_text = (
+            f"Date: {date_val}\n"
+            f"From: {from_addr}\n"
+            f"Subject: {subject}\n\n"
+            f"{cleaned_body}\n\n"
+            f"{'=' * 80}\n\n"
+        )
+        yearly_content[year].append(message_text)
+
+        count += 1
+        if count % 100 == 0:
+            log(f"Processed {count} messages...", verbose, level=LogLevel.PROGRESS)
 
     log(
-        f"Done! Extracted {count} messages to {output_file}.",
+        f"Done! Processed {count} messages.",
         verbose,
         level=LogLevel.STATUS,
     )
+
+    return {yr: "".join(contents) for yr, contents in yearly_content.items()}
