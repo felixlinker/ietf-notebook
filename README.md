@@ -2,7 +2,7 @@
 
 Automate gathering of [NotebookLM](https://notebooklm.google.com/)-ready documents for an [IETF](https://www.ietf.org/) Working Group.
 
-This tool gathers Working Group charters, drafts, meeting minutes, PDF slides, mailing list archives, and GitHub issues into a set of clean text files and PDFs suitable for ingestion into NotebookLM.
+This tool gathers Working Group charters, drafts, meeting minutes, PDF slides, meeting transcripts, mailing list archives, and GitHub issues into a set of clean text files and PDFs suitable for ingestion into NotebookLM.
 
 ## Installation
 
@@ -34,6 +34,7 @@ ietf-notebook [wg_shortname] _OPTIONS_
 - **Mailing List Discovery**: The tool automatically finds the mailing list for the WG from the Datatracker.
 - **IMAP Retrieval**: Mailing list archives are fetched via IMAP from `imap.ietf.org` and cached locally in `.imap-cache/`.
 - **GitHub Strategy**: The tool first checks for `archive.json` on the `gh-pages` branch (common in repos using [Martin Thomson's template](https://github.com/martinthomson/internet-draft-template)).
+- **Transcripts**: Meeting transcripts are fetched from the `ietf-minutes-data` repository (branch `cache`) and cached locally in `.transcript-cache/`. They are identified by the WG name in the filename.
 - **GitHub Auth**: To avoid rate limits when fetching from the API, set the `GITHUB_TOKEN` environment variable.
 
 ## Contributing

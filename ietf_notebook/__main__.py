@@ -5,6 +5,7 @@ from .github import download_github_issues, process_github_issues
 from .meetings import process_meetings
 from .charter import process_charter
 from .drafts import process_documents
+from .transcripts import process_transcripts
 from .utils import Verbosity, LogLevel, log
 
 
@@ -92,7 +93,14 @@ def main() -> None:
         )
     )
 
-    # 4. Documents (Drafts & RFCs)
+    # 4. Transcripts
+    results.extend(
+        process_transcripts(
+            args.wg, args.destination, force=args.force, verbose=verbosity
+        )
+    )
+
+    # 5. Documents (Drafts & RFCs)
     results.extend(
         process_documents(
             args.wg, args.destination, force=args.force, verbose=verbosity
