@@ -18,7 +18,11 @@ def format_date(iso_date: Optional[str]) -> str:
 
 
 def process_github_issues(
-    input_file: str, output_file: str, verbose: Verbosity = Verbosity.STATUS
+    input_file: str,
+    output_file: str,
+    include_labels: Optional[List[str]] = None,
+    exclude_labels: Optional[List[str]] = None,
+    verbose: Verbosity = Verbosity.STATUS,
 ) -> List[str]:
     """Process a GitHub issues JSON archive and write cleaned text to output_file."""
     log(f"Opening {input_file}...", verbose, level=LogLevel.PROGRESS)
@@ -32,6 +36,9 @@ def process_github_issues(
     issues = data.get("issues", [])
     repo_name = data.get("repo", "Unknown Repo")
 
+    processed_count = 0
+    filtered_count = 0
+
     with open(output_file, "w", encoding="utf-8") as out_fh:
         out_fh.write(f"Repository: {repo_name}\n")
         out_fh.write(f"Archive Export Date: {format_date(data.get('timestamp'))}\n")
@@ -43,15 +50,28 @@ def process_github_issues(
             state = issue.get("state", "(Unknown State)")
             author = issue.get("author", "(Unknown Author)")
             created_at = format_date(issue.get("createdAt"))
-            labels = ", ".join(issue.get("labels", []))
+            issue_labels = issue.get("labels", [])
+            labels_str = ", ".join(issue_labels)
             body = (issue.get("body") or "").strip()
+
+            # Inclusion filter: at least one label must match if include_labels is provided
+            if include_labels:
+                if not any(label in issue_labels for label in include_labels):
+                    filtered_count += 1
+                    continue
+
+            # Exclusion filter: no label must match if exclude_labels is provided
+            if exclude_labels:
+                if any(label in issue_labels for label in exclude_labels):
+                    filtered_count += 1
+                    continue
 
             out_fh.write(f"Issue #{number}: {title}\n")
             out_fh.write(f"State: {state}\n")
             out_fh.write(f"Date: {created_at}\n")
             out_fh.write(f"Author: {author}\n")
-            if labels:
-                out_fh.write(f"Labels: {labels}\n")
+            if labels_str:
+                out_fh.write(f"Labels: {labels_str}\n")
             out_fh.write("\n")
 
             out_fh.write((body or "(No description provided)") + "\n")
@@ -69,12 +89,12 @@ def process_github_issues(
                     out_fh.write(c_body + "\n\n")
 
             out_fh.write("=" * 80 + "\n\n")
+            processed_count += 1
 
-    log(
-        f"Done! Extracted {len(issues)} issues to {output_file}.",
-        verbose,
-        level=LogLevel.STATUS,
-    )
+    msg = f"Done! Extracted {processed_count} issues to {output_file}."
+    if filtered_count > 0:
+        msg += f" ({filtered_count} issues filtered out by labels)"
+    log(msg, verbose, level=LogLevel.STATUS)
     return [output_file]
 
 
@@ -145,7 +165,11 @@ def download_github_issues(
                     json.dump(archive_data, json_fh, indent=2)
                 return True
             except (json.JSONDecodeError, TypeError) as err:
-                log(f"Error parsing archive JSON: {err}", Verbosity.VERBOSE, level=LogLevel.STATUS)
+                log(
+                    f"Error parsing archive JSON: {err}",
+                    Verbosity.VERBOSE,
+                    level=LogLevel.STATUS,
+                )
         log("No archive found on gh-pages.", verbose, level=LogLevel.PROGRESS)
     except (requests.RequestException, OSError) as err:
         log(

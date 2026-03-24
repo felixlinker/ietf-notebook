@@ -21,6 +21,8 @@ ietf-notebook [wg_shortname] _OPTIONS_
 - `wg_shortname`: IETF Working Group short name (e.g., `httpbis`).
 - `--destination`: Folder to save files in (default: current directory).
 - `--github`: GitHub org/repo for issues (e.g., `ietf-wg-httpbis/wg-materials`).
+- `--github-label`: Include only GitHub issues with this label (can be specified multiple times).
+- `--exclude-github-label`: Exclude GitHub issues with this label (can be specified multiple times).
 - `--months`: Number of months of mailing list history to fetch (default: all).
 - `--force`: Force re-downloading of existing files. By default, the tool skips files that already exist in the destination.
 - `--quiet`: No messages except for errors and the final resource summary.
@@ -28,7 +30,7 @@ ietf-notebook [wg_shortname] _OPTIONS_
 
 ### Default Behavior
 
-- **Charters, Meetings, and Mbox**: Existing files are skipped unless `--force` is used.
+- **Charters, Meetings, and Documents**: Existing files are skipped unless `--force` is used.
 - **Mailing List Discovery**: The tool automatically finds the mailing list for the WG from the Datatracker.
 - **IMAP Retrieval**: Mailing list archives are fetched via IMAP from `imap.ietf.org` and cached locally in `.imap-cache/`.
 - **GitHub Strategy**: The tool first checks for `archive.json` on the `gh-pages` branch (common in repos using [Martin Thomson's template](https://github.com/martinthomson/internet-draft-template)).

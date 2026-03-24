@@ -223,12 +223,12 @@ def sync_mailing_list(
 
         # Now process all cached messages into the final archive
         # We only process the UIDs that were found in the search
-        yearly_archives = process_cache(
-            cache_dir, [u.decode() for u in uids], verbose
-        )
+        yearly_archives = process_cache(cache_dir, [u.decode() for u in uids], verbose)
         updated_files = []
         for year, content in yearly_archives.items():
-            output_file = os.path.join(dest_folder, f"{wg_name}-mail-archive-{year}.txt")
+            output_file = os.path.join(
+                dest_folder, f"{wg_name}-mail-archive-{year}.txt"
+            )
             with open(output_file, "w", encoding="utf-8") as out_fh:
                 out_fh.write(content)
             updated_files.append(output_file)
@@ -268,7 +268,9 @@ def process_cache(
             continue
 
         with open(cache_path, "rb") as file_handle:
-            msg = email.message_from_binary_file(file_handle, policy=email.policy.default)
+            msg = email.message_from_binary_file(
+                file_handle, policy=email.policy.default
+            )
 
         # Extract Year from Date header
         date_header = msg.get("Date")

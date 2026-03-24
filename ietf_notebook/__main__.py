@@ -23,6 +23,16 @@ def main() -> None:
         help="Number of months of mailing list archives to fetch (default: all)",
     )
     parser.add_argument(
+        "--github-label",
+        action="append",
+        help="Include only GitHub issues with this label (can be specified multiple times)",
+    )
+    parser.add_argument(
+        "--exclude-github-label",
+        action="append",
+        help="Exclude GitHub issues with this label (can be specified multiple times)",
+    )
+    parser.add_argument(
         "--destination",
         default=".",
         help="Destination folder (default: current directory)",
@@ -84,7 +94,9 @@ def main() -> None:
 
     # 4. Documents (Drafts & RFCs)
     results.extend(
-        process_documents(args.wg, args.destination, force=args.force, verbose=verbosity)
+        process_documents(
+            args.wg, args.destination, force=args.force, verbose=verbosity
+        )
     )
 
     # 5. GitHub Issues
@@ -93,11 +105,23 @@ def main() -> None:
         gh_txt = os.path.join(args.destination, f"{args.wg}-github-issues.txt")
 
         if download_github_issues(args.github, gh_json, verbose=verbosity):
-            results.extend(process_github_issues(gh_json, gh_txt, verbose=verbosity))
+            results.extend(
+                process_github_issues(
+                    gh_json,
+                    gh_txt,
+                    include_labels=args.github_label,
+                    exclude_labels=args.exclude_github_label,
+                    verbose=verbosity,
+                )
+            )
             try:
                 os.remove(gh_json)
             except OSError as err:
-                log(f"Error cleaning up {gh_json}: {err}", verbosity, level=LogLevel.ERROR)
+                log(
+                    f"Error cleaning up {gh_json}: {err}",
+                    verbosity,
+                    level=LogLevel.ERROR,
+                )
     else:
         log(
             "Skip GitHub issues: no GitHub repo provided.",
