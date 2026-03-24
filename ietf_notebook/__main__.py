@@ -4,7 +4,7 @@ from .mbox import sync_mailing_list
 from .github import download_github_issues, process_github_issues
 from .meetings import process_meetings
 from .charter import process_charter
-from .drafts import process_drafts
+from .drafts import process_documents
 from .utils import Verbosity, LogLevel, log
 
 
@@ -82,9 +82,9 @@ def main() -> None:
         )
     )
 
-    # 4. Drafts
+    # 4. Documents (Drafts & RFCs)
     results.extend(
-        process_drafts(args.wg, args.destination, force=args.force, verbose=verbosity)
+        process_documents(args.wg, args.destination, force=args.force, verbose=verbosity)
     )
 
     # 5. GitHub Issues
