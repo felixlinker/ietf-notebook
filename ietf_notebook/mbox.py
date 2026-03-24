@@ -2,6 +2,7 @@ import email
 import html
 import imaplib
 import os
+import re
 from datetime import datetime, timedelta
 from email import policy
 from email.message import EmailMessage
@@ -13,6 +14,7 @@ IMAP_SERVER = "imap.ietf.org"
 IMAP_PORT = 993
 IMAP_USER = "anonymous"
 IMAP_PASS = "mnot+ietf-notebook@ietf.org"
+BATCH_SIZE = 50
 
 
 def extract_text_content(msg: EmailMessage) -> str:
@@ -54,6 +56,61 @@ def clean_email_text(text: str) -> str:
         cleaned_lines.append(line)
 
     return "\n".join(cleaned_lines).strip()
+
+
+def _download_batches(
+    mail: imaplib.IMAP4_SSL,
+    missing_uids: List[bytes],
+    cache_dir: str,
+    verbose: Verbosity,
+) -> int:
+    """Download messages in batches and save to cache. Returns count of new messages."""
+    new_count = 0
+    log(
+        f"Downloading {len(missing_uids)} new messages in batches of {BATCH_SIZE}...",
+        verbose,
+        level=LogLevel.PROGRESS,
+    )
+    for i in range(0, len(missing_uids), BATCH_SIZE):
+        batch = missing_uids[i : i + BATCH_SIZE]
+        batch_str = ",".join(b.decode() for b in batch)
+        status, msg_data = mail.uid("fetch", batch_str, "(RFC822)")
+
+        if status != "OK" or not msg_data:
+            continue
+
+        for item in msg_data:
+            if not isinstance(item, tuple) or len(item) < 2:
+                continue
+
+            # item[0] is the response header, item[1] is the message body
+            header = item[0]
+            if not isinstance(header, bytes):
+                continue
+            resp_header = header.decode()
+
+            # Find UID in the response header
+            uid_match = re.search(r"UID\s+(\d+)", resp_header)
+            if not uid_match:
+                continue
+
+            msg_uid = uid_match.group(1)
+            cache_file = os.path.join(cache_dir, f"{msg_uid}.eml")
+            body = item[1]
+            if not isinstance(body, bytes):
+                continue
+
+            with open(cache_file, "wb") as file_handle:
+                file_handle.write(body)
+            new_count += 1
+
+        if new_count > 0:
+            log(
+                f"Downloaded {new_count}/{len(missing_uids)} new messages...",
+                verbose,
+                level=LogLevel.PROGRESS,
+            )
+    return new_count
 
 
 def sync_mailing_list(
@@ -102,7 +159,7 @@ def sync_mailing_list(
                 level=LogLevel.PROGRESS,
             )
 
-        status, data = mail.search(None, search_criteria)
+        status, data = mail.uid("search", search_criteria)
         if status != "OK":
             log("Error: IMAP search failed.", verbose, level=LogLevel.ERROR)
             return []
@@ -110,26 +167,17 @@ def sync_mailing_list(
         uids = data[0].split()
         log(f"Found {len(uids)} potential messages.", verbose, level=LogLevel.PROGRESS)
 
-        new_count = 0
+        # Filter out what we already have in cache
+        missing_uids = []
         for uid in uids:
             uid_str = uid.decode()
             cache_file = os.path.join(cache_dir, f"{uid_str}.eml")
-
             if not os.path.exists(cache_file):
-                status, msg_data = mail.fetch(uid, "(RFC822)")
-                if status == "OK" and msg_data:
-                    # msg_data[0] is typically a tuple (UID + flags, message body)
-                    res_body = msg_data[0]
-                    if isinstance(res_body, tuple) and len(res_body) > 1:
-                        with open(cache_file, "wb") as file_handle:
-                            file_handle.write(res_body[1])
-                        new_count += 1
-                    if new_count % 10 == 0:
-                        log(
-                            f"Downloaded {new_count} new messages...",
-                            verbose,
-                            level=LogLevel.PROGRESS,
-                        )
+                missing_uids.append(uid)
+
+        new_count = 0
+        if missing_uids:
+            new_count = _download_batches(mail, missing_uids, cache_dir, verbose)
 
         mail.logout()
         if new_count > 0:
@@ -142,8 +190,9 @@ def sync_mailing_list(
             log("No new messages to download.", verbose, level=LogLevel.STATUS)
 
         # Now process all cached messages into the final archive
+        # We only process the UIDs that were found in the search
         output_file = os.path.join(dest_folder, f"{wg_name}-mailing-list.txt")
-        process_cache(cache_dir, output_file, months, verbose)
+        process_cache(cache_dir, output_file, [u.decode() for u in uids], verbose)
         return [output_file]
 
     except (imaplib.IMAP4.error, OSError) as err:
@@ -154,7 +203,7 @@ def sync_mailing_list(
 def process_cache(
     cache_dir: str,
     output_file: str,
-    months: Optional[int] = None,
+    uids: Optional[List[str]] = None,
     verbose: Verbosity = Verbosity.STATUS,
 ) -> None:
     """Process cached .eml files and write cleaned text to output_file."""
@@ -164,37 +213,23 @@ def process_cache(
         level=LogLevel.STATUS,
     )
 
-    # Get all .eml files
-    eml_files = [fname for fname in os.listdir(cache_dir) if fname.endswith(".eml")]
-    # Sort them numerically by UID
-    eml_files.sort(key=lambda x: int(x.split(".")[0]))
-
-    cutoff_date = None
-    if months:
-        cutoff_date = datetime.now() - timedelta(days=30 * months)
+    # Get .eml files to process
+    if uids:
+        eml_files = [f"{uid}.eml" for uid in uids]
+    else:
+        eml_files = [fname for fname in os.listdir(cache_dir) if fname.endswith(".eml")]
+        # Sort them numerically by UID
+        eml_files.sort(key=lambda x: int(x.split(".")[0]))
 
     count = 0
     with open(output_file, "w", encoding="utf-8") as out_fh:
         for eml_file in eml_files:
             cache_path = os.path.join(cache_dir, eml_file)
+            if not os.path.exists(cache_path):
+                continue
+
             with open(cache_path, "rb") as file_handle:
                 msg = email.message_from_binary_file(file_handle, policy=policy.default)
-
-            # Check date if months filter is active
-            date_header = msg.get("Date")
-            if cutoff_date and date_header:
-                try:
-                    # Parse email date (using EmailMessage's property)
-                    if hasattr(date_header, "datetime"):
-                        msg_dt = date_header.datetime
-                        if msg_dt.tzinfo:
-                            msg_dt = msg_dt.replace(tzinfo=None)
-
-                        if msg_dt < cutoff_date:
-                            continue
-                except (AttributeError, ValueError, TypeError):
-                    # Fallback to string-based parsing if datetime property fails
-                    pass
 
             subject = msg.get("Subject", "(No Subject)")
             from_addr = msg.get("From", "(Unknown Sender)")
