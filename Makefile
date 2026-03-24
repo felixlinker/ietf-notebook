@@ -13,6 +13,8 @@ typecheck: typecheck_py
 .PHONY: tidy
 tidy: tidy_py
 
-
+.PHONY: test
+test:
+	@echo "needs tests"
 
 include Makefile.pyproject
