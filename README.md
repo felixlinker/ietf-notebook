@@ -31,7 +31,8 @@ ietf-notebook [wg_shortname] --destination [folder] --github [owner/repo] --mont
 - **Charters, Meetings, and Mbox**: Existing files are skipped unless `--force` is used.
 - **Mailing List Discovery**: The tool automatically finds the mailing list for the WG from the Datatracker.
 - **IMAP Retrieval**: Mailing list archives are fetched via IMAP from `imap.ietf.org` and cached locally in `.imap-cache/`.
-- **GitHub Issues**: GitHub issues are always re-fetched by default (equivalent to `--force`) to ensure the latest comments are included.
+- **GitHub Strategy**: The tool first checks for `archive.json` on the `gh-pages` branch (common in repos using [Martin Thomson's template](https://github.com/martinthomson/internet-draft-template)).
+- **GitHub Auth**: To avoid rate limits when fetching from the API, set the `GITHUB_TOKEN` environment variable.
 - **PDF Materials**: PDF slides are downloaded directly into the destination folder with names like `ietf124-slides-124-aipref-overview-00.pdf`.
 - **Markdown**: The tool automatically prioritizes raw Markdown content for charters and minutes.
 

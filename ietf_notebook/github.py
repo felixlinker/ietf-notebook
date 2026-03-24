@@ -123,12 +123,36 @@ def download_github_issues(
         response = requests.get(archive_url, timeout=30)
         if response.status_code == 200:
             log("Archive found; downloading...", verbose, level=LogLevel.STATUS)
-            with open(dest_path, "w", encoding="utf-8") as json_file:
-                json_file.write(response.text)
-            return True
-        log("No archive found on gh-pages.", verbose, level=LogLevel.VERBOSE)
+            try:
+                archive_data = response.json()
+                # Ensure it's in our expected format (dict with 'issues' key)
+                if isinstance(archive_data, list):
+                    archive_data = {
+                        "repo": f"{owner}/{repo}",
+                        "timestamp": datetime.now().isoformat(),
+                        "issues": archive_data,
+                    }
+                elif "issues" not in archive_data:
+                    # If it's a dict but missing 'issues', we might still want to wrap it
+                    # or handle it differently. For now, assume it might be a single issue
+                    # or some other format and wrap if it's not our expected schema.
+                    archive_data = {
+                        "repo": f"{owner}/{repo}",
+                        "timestamp": datetime.now().isoformat(),
+                        "issues": [archive_data],
+                    }
+                with open(dest_path, "w", encoding="utf-8") as json_fh:
+                    json.dump(archive_data, json_fh, indent=2)
+                return True
+            except (json.JSONDecodeError, TypeError) as err:
+                log(f"Error parsing archive JSON: {err}", Verbosity.VERBOSE, level=LogLevel.STATUS)
+        log("No archive found on gh-pages.", verbose, level=LogLevel.PROGRESS)
     except (requests.RequestException, OSError) as err:
-        log(f"Error checking gh-pages archive: {err}", verbose, level=LogLevel.VERBOSE)
+        log(
+            f"Error checking gh-pages archive: {err}",
+            verbose,
+            level=LogLevel.STATUS,
+        )
 
     log(
         f"Fetching GitHub issues via API for {owner}/{repo}...",

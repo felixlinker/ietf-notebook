@@ -93,8 +93,11 @@ def main() -> None:
         gh_txt = os.path.join(args.destination, f"{args.wg}-github-issues.txt")
 
         if download_github_issues(args.github, gh_json, verbose=verbosity):
-            results.append(gh_json)
             results.extend(process_github_issues(gh_json, gh_txt, verbose=verbosity))
+            try:
+                os.remove(gh_json)
+            except OSError as err:
+                log(f"Error cleaning up {gh_json}: {err}", verbosity, level=LogLevel.ERROR)
     else:
         log(
             "Skip GitHub issues: no GitHub repo provided.",
