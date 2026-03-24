@@ -44,7 +44,7 @@ def process_github_issues(
             author = issue.get("author", "(Unknown Author)")
             created_at = format_date(issue.get("createdAt"))
             labels = ", ".join(issue.get("labels", []))
-            body = issue.get("body", "").strip()
+            body = (issue.get("body") or "").strip()
 
             out_fh.write(f"Issue #{number}: {title}\n")
             out_fh.write(f"State: {state}\n")
@@ -63,7 +63,7 @@ def process_github_issues(
                 for comment in comments:
                     c_author = comment.get("author", "(Unknown)")
                     c_date = format_date(comment.get("createdAt"))
-                    c_body = comment.get("body", "").strip()
+                    c_body = (comment.get("body") or "").strip()
 
                     out_fh.write(f"--- Comment by {c_author} on {c_date} ---\n")
                     out_fh.write(c_body + "\n\n")
@@ -112,6 +112,23 @@ def download_github_issues(
         )
         return False
     owner, repo = repo_short.split("/", 1)
+    archive_url = f"https://{owner}.github.io/{repo}/archive.json"
+
+    log(
+        f"Checking for GitHub archive at {archive_url}...",
+        verbose,
+        level=LogLevel.STATUS,
+    )
+    try:
+        response = requests.get(archive_url, timeout=30)
+        if response.status_code == 200:
+            log("Archive found; downloading...", verbose, level=LogLevel.STATUS)
+            with open(dest_path, "w", encoding="utf-8") as json_file:
+                json_file.write(response.text)
+            return True
+        log("No archive found on gh-pages.", verbose, level=LogLevel.VERBOSE)
+    except (requests.RequestException, OSError) as err:
+        log(f"Error checking gh-pages archive: {err}", verbose, level=LogLevel.VERBOSE)
 
     log(
         f"Fetching GitHub issues via API for {owner}/{repo}...",
