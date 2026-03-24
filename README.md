@@ -1,6 +1,6 @@
 # ietf-notebook
 
-Automate gathering of [NotebookLM(https://notebooklm.google.com/)]-ready documents for an [IETF](https://www.ietf.org/) Working Group.
+Automate gathering of [NotebookLM](https://notebooklm.google.com/)-ready documents for an [IETF](https://www.ietf.org/) Working Group.
 
 This tool gathers Working Group charters, drafts, meeting minutes, PDF slides, mailing list archives, and GitHub issues into a set of clean text files and PDFs suitable for ingestion into NotebookLM.
 
@@ -13,18 +13,18 @@ pipx install ietf-notebook
 ## Usage
 
 ```bash
-ietf-notebook [wg_shortname] --destination [folder] --github [owner/repo] --months [number]
+ietf-notebook [wg_shortname] _OPTIONS_
 ```
 
 ### Options
 
-- `wg`: IETF Working Group short name (e.g., `httpbis`).
+- `wg_shortname`: IETF Working Group short name (e.g., `httpbis`).
 - `--destination`: Folder to save files in (default: current directory).
-- `--github`: GitHub short name (e.g., `ietf-wg-httpbis/wg-materials`).
+- `--github`: GitHub org/repo for issues (e.g., `ietf-wg-httpbis/wg-materials`).
 - `--months`: Number of months of mailing list history to fetch (default: all).
 - `--force`: Force re-downloading of existing files. By default, the tool skips files that already exist in the destination.
 - `--quiet`: No messages except for errors and the final resource summary.
-- `--verbose`: Detailed progress reporting (default is high-level status only).
+- `--verbose`: Detailed progress reporting.
 
 ### Default Behavior
 
@@ -33,8 +33,6 @@ ietf-notebook [wg_shortname] --destination [folder] --github [owner/repo] --mont
 - **IMAP Retrieval**: Mailing list archives are fetched via IMAP from `imap.ietf.org` and cached locally in `.imap-cache/`.
 - **GitHub Strategy**: The tool first checks for `archive.json` on the `gh-pages` branch (common in repos using [Martin Thomson's template](https://github.com/martinthomson/internet-draft-template)).
 - **GitHub Auth**: To avoid rate limits when fetching from the API, set the `GITHUB_TOKEN` environment variable.
-- **PDF Materials**: PDF slides are downloaded directly into the destination folder with names like `ietf124-slides-124-aipref-overview-00.pdf`.
-- **Markdown**: The tool automatically prioritizes raw Markdown content for charters and minutes.
 
 ## Contributing
 
