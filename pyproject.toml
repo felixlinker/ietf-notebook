@@ -15,6 +15,7 @@ classifiers = [
 ]
 dependencies = [
     "requests",
+    "pip-system-certs",
     "beautifulsoup4",
 ]
 
