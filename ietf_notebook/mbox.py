@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 from typing import List, Optional, Dict
 
-from .utils import LogLevel, Verbosity, get_mailing_list_name, log
+from .utils import LogLevel, Verbosity, get_mailing_list_name, log, get_cache_dir
 
 IMAP_SERVER = "imap.ietf.org"
 IMAP_PORT = 993
@@ -159,9 +159,9 @@ def sync_mailing_list(
         level=LogLevel.STATUS,
     )
 
-    cache_dir = os.path.join(dest_folder, ".imap-cache", list_name)
+    cache_dir = os.path.join(get_cache_dir(), "imap-cache", wg_name, list_name)
     if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
 
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)

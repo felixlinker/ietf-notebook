@@ -1,3 +1,4 @@
+import os
 import re
 from enum import Enum
 from typing import Optional, Dict
@@ -5,6 +6,22 @@ import requests
 from bs4 import BeautifulSoup
 
 DEFAULT_HEADERS = {"User-Agent": "ietf-notebook/0.1.0"}
+
+
+def get_config_dir() -> str:
+    """Return the configuration directory, creating it if necessary."""
+    config_dir = os.path.expanduser("~/.config/ietf-notebook")
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir, exist_ok=True)
+    return config_dir
+
+
+def get_cache_dir() -> str:
+    """Return the cache directory, creating it if necessary."""
+    cache_dir = os.path.expanduser("~/.cache/ietf-notebook")
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
 
 
 def get_mailing_list_name(wg_name: str) -> str:
@@ -178,3 +195,19 @@ def clean_html(html_content: str) -> str:
 def format_filename(name: str) -> str:
     """Format a string to be a safe filename."""
     return re.sub(r"[^\w\s-]", "", name).strip().lower().replace(" ", "_")
+
+
+def get_wg_title(wg_name: str) -> str:
+    """Fetch the full WG title from the IETF Datatracker."""
+    url = f"https://datatracker.ietf.org/group/{wg_name}/about/"
+    res = fetch_resource(url)
+    if res:
+        soup = BeautifulSoup(res.text, "html.parser")
+        h1 = soup.find("h1")
+        if h1:
+            title = h1.get_text(strip=True)
+            # Clean up title if it contains the short name in parens
+            if "(" in title and wg_name.lower() in title.lower():
+                title = title.split("(")[0].strip()
+            return title
+    return f"{wg_name.upper()} Working Group"

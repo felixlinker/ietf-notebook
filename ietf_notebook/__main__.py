@@ -6,7 +6,12 @@ from .meetings import process_meetings
 from .charter import process_charter
 from .drafts import process_documents
 from .transcripts import process_transcripts
-from .utils import Verbosity, LogLevel, log
+from .utils import Verbosity, LogLevel, log, get_config_dir, get_wg_title
+from .notebooklm import (
+    get_credentials,
+    create_notebook,
+    upload_source,
+)
 
 
 def main() -> None:
@@ -48,7 +53,26 @@ def main() -> None:
         "--verbose", "-v", action="store_true", help="Detailed progress reporting"
     )
 
+    parser.add_argument(
+        "--create",
+        metavar="GCP_PROJECT_ID",
+        help="Upload the generated files to a new notebook in NotebookLM",
+    )
+    parser.add_argument(
+        "--credentials-file",
+        default=os.path.join(get_config_dir(), "client_secrets.json"),
+        help="Path to the Google Cloud OAuth client secrets file",
+    )
+    parser.add_argument(
+        "--token-file",
+        default=os.path.join(get_config_dir(), "token.json"),
+        help="Path to the Google Cloud OAuth token file",
+    )
+
     args = parser.parse_args()
+
+    if args.create and not args.gcp_project:
+        parser.error("--gcp-project is required when using --create")
 
     if not os.path.exists(args.destination):
         os.makedirs(args.destination)
@@ -107,7 +131,7 @@ def main() -> None:
         )
     )
 
-    # 5. GitHub Issues
+    # 6. GitHub Issues
     if args.github:
         gh_json = os.path.join(args.destination, f"{args.wg}-github-issues.json")
         gh_txt = os.path.join(args.destination, f"{args.wg}-github-issues.txt")
@@ -136,6 +160,51 @@ def main() -> None:
             verbosity,
             level=LogLevel.PROGRESS,
         )
+
+    if args.create:
+        gcp_project = args.create
+        print("-" * 40)
+        print("Exporting to NotebookLM...")
+
+        creds = get_credentials(
+            args.credentials_file, args.token_file, verbose=verbosity
+        )
+        if creds:
+            wg_title = get_wg_title(args.wg)
+            notebook_title = f"IETF {wg_title} Working Group"
+            notebook_id = create_notebook(
+                gcp_project, notebook_title, creds, verbose=verbosity
+            )
+
+            if notebook_id:
+                success_count = 0
+                # Filter results to include only text files for upload
+                upload_files = [f for f in results if f.endswith(".txt")]
+                for file_path in sorted(list(set(upload_files))):
+                    if upload_source(
+                        gcp_project,
+                        notebook_id,
+                        file_path,
+                        creds,
+                        verbose=verbosity,
+                    ):
+                        success_count += 1
+
+                if success_count > 0:
+                    print(
+                        f"Successfully uploaded {success_count} files "
+                        f"to notebook '{notebook_title}'."
+                    )
+                else:
+                    log(
+                        "No files were uploaded to the notebook.",
+                        verbosity,
+                        level=LogLevel.ERROR,
+                    )
+            else:
+                log("Failed to create notebook.", verbosity, level=LogLevel.ERROR)
+        else:
+            log("Authentication failed.", verbosity, level=LogLevel.ERROR)
 
     if verbosity != Verbosity.QUIET:
         print("-" * 40)

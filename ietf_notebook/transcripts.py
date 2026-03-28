@@ -2,7 +2,7 @@ import os
 import subprocess
 from typing import List
 
-from .utils import LogLevel, Verbosity, log
+from .utils import LogLevel, Verbosity, log, get_cache_dir
 
 
 def process_transcripts(
@@ -15,7 +15,7 @@ def process_transcripts(
     Fetch transcripts for a WG from the ietf-minutes-data repo and write to destination.
     """
     repo_url = "https://github.com/ietf-minutes/ietf-minutes-data.git"
-    cache_dir = os.path.abspath(".transcript-cache")
+    cache_dir = os.path.join(get_cache_dir(), "transcript-cache", wg_name)
     branch = "cache"
 
     # 1. Sync the repo
