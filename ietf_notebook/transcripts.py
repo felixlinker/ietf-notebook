@@ -8,7 +8,6 @@ from .utils import LogLevel, Verbosity, log, get_cache_dir
 def process_transcripts(
     wg_name: str,
     destination: str,
-    force: bool = False,
     verbose: Verbosity = Verbosity.STATUS,
     months: Optional[int] = None,
 ) -> List[str]:
@@ -85,7 +84,7 @@ def process_transcripts(
             dest_filename = f"{name.lower()}-transcript{ext}"
             dest_path = os.path.join(destination, dest_filename)
 
-            if force or not os.path.exists(dest_path):
+            if not os.path.exists(dest_path):
                 log(
                     f"Copying transcript: {dest_filename}...",
                     verbose,

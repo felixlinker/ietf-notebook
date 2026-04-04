@@ -78,7 +78,6 @@ def get_wg_documents(
 def process_documents(
     wg_name: str,
     destination: str,
-    force: bool = False,
     verbose: Verbosity = Verbosity.STATUS,
 ) -> List[str]:
     """Download all revisions of WG drafts and RFCs as text."""
@@ -102,7 +101,7 @@ def process_documents(
                 filename = f"{name}-{rev_str}.txt"
                 filepath = os.path.join(destination, filename)
 
-                if not force and os.path.exists(filepath):
+                if os.path.exists(filepath):
                     continue
 
                 url = f"https://www.ietf.org/archive/id/{name}-{rev_str}.txt"
@@ -124,7 +123,7 @@ def process_documents(
             filename = f"{r_name}.txt"
             filepath = os.path.join(destination, filename)
 
-            if not force and os.path.exists(filepath):
+            if os.path.exists(filepath):
                 continue
 
             url = f"https://www.rfc-editor.org/rfc/rfc{r_num}.txt"

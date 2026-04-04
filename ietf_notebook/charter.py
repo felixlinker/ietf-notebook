@@ -1,10 +1,13 @@
+import os
 from typing import List
 from bs4 import BeautifulSoup
 from .utils import Verbosity, LogLevel, clean_html, fetch_resource, log, get_group_type
 
 
 def process_charter(
-    wg_name: str, output_file: str, verbose: Verbosity = Verbosity.STATUS
+    wg_name: str,
+    output_file: str,
+    verbose: Verbosity = Verbosity.STATUS,
 ) -> List[str]:
     """Fetch the WG charter and write to output_file. Returns list of updated files."""
     group_type = get_group_type(wg_name)
@@ -54,11 +57,20 @@ def process_charter(
             charter_text = clean_html(html)
 
     if charter_text:
+        # Check if the content is different from the existing file
+        new_content = f"Working Group Charter: {wg_name}\n"
+        new_content += f"Source: {url}\n"
+        new_content += "=" * 80 + "\n\n"
+        new_content += charter_text + "\n"
+
+        if os.path.exists(output_file):
+            with open(output_file, "r", encoding="utf-8") as in_fh:
+                if in_fh.read() == new_content:
+                    log(f"Charter for {wg_name} is unchanged.", verbose, level=LogLevel.PROGRESS)
+                    return []
+
         with open(output_file, "w", encoding="utf-8") as out_fh:
-            out_fh.write(f"Working Group Charter: {wg_name}\n")
-            out_fh.write(f"Source: {url}\n")
-            out_fh.write("=" * 80 + "\n\n")
-            out_fh.write(charter_text + "\n")
+            out_fh.write(new_content)
 
         log(f"Done! Charter written to {output_file}.", verbose, level=LogLevel.STATUS)
         return [output_file]

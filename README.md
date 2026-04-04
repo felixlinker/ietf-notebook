@@ -12,33 +12,50 @@ pipx install ietf-notebook
 
 ## Usage
 
+### First Run
+
+To start collecting documents for a Working Group, use the `--destination` flag to specify where the documents should be stored. This will create a directory with the WG name and populate it with the WG charter, meeting minutes, slides, transcripts, mailing list archives, and GitHub issues.
+
+Because `ietf-notebook` persists Working Group configuration options, you don't need to specify them again for that Working Group. Use `--clear-config` to reset a group's configuration.
+
 ```bash
-ietf-notebook [OPTIONS] wg_shortname
+ietf-notebook [OPTIONS] --destination _destination_ _wg_shortname_
 ```
 
-`ietf-notebook` persists Working Group configuration options. Once set, you don't need to specify them again for that Working Group. Use `--clear-config` to reset a group's configuration.
+Then, upload all of the files in _destination_ to NotebookLM.
+
+### Subsequent Updates
+
+To update the documents, run the same command again. `ietf-notebook` will only download files that have changed since the last run. Then, upload the new and updated files to NotebookLM.
+
+```bash
+ietf-notebook _wg_shortname_
+```
+
 
 ### Options
 
 Working Group-specific:
 - `wg_shortname`: IETF Working Group short name (e.g., `httpbis`).
-- `--destination`: Folder to save files in (default: current directory).
+- `--destination`: Folder for mirrored records (required on first run; then persisted).
 - `--github`: GitHub org/repo for issues (e.g., `ietf-wg-httpbis/wg-materials`).
 - `--github-label`: Include only GitHub issues with this label (can be specified multiple times).
 - `--exclude-github-label`: Exclude GitHub issues with this label (can be specified multiple times).
 - `--months`: Number of months of mailing list history to fetch (default: 12).
 - `--create`: See "NotebookLM Export" below.
 - `--clear-config`: Clear the persisted configuration for this Working Group.
+- `--clear-cache`: Clear the local file cache and re-download everything from scratch.
 
 General options:
-- `--force`: Force re-downloading of existing files. By default, the tool skips files that already exist in the destination.
 - `--quiet`: No messages except for errors and the final resource summary.
 - `--verbose`: Detailed progress reporting.
 
 
 ### Default Behavior
 
-- **Charters, Meetings, and Documents**: Existing files are skipped unless `--force` is used.
+- **Selective Mirroring**: The `--destination` folder is cleared at the start of each run. It is then populated **only** with files that were updated or newly created in the local cache during that run.
+- **File Caching**: All documents are collected in `~/.cache/ietf-notebook/[wg]/files/` to avoid redundant downloads.
+- **Charters, Meetings, and Documents**: Existing files in the cache are skipped unless `--clear-cache` is used.
 - **Mailing List Discovery**: The tool automatically finds the mailing list for the WG from the Datatracker.
 - **IMAP Retrieval**: Mailing list archives are fetched via IMAP from `imap.ietf.org` and cached locally in `~/.cache/ietf-notebook/{wg_name}/imap-cache/`.
 - **GitHub Strategy**: The tool first checks for `archive.json` on the `gh-pages` branch.

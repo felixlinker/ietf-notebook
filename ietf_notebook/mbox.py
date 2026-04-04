@@ -247,6 +247,12 @@ def sync_mailing_list(
             output_file = os.path.join(
                 dest_folder, f"{wg_name}-mail-archive-{year}.txt"
             )
+            # Only write and return if content changed
+            if os.path.exists(output_file):
+                with open(output_file, "r", encoding="utf-8") as in_fh:
+                    if in_fh.read() == content:
+                        continue
+
             with open(output_file, "w", encoding="utf-8") as out_fh:
                 out_fh.write(content)
             updated_files.append(output_file)

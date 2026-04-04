@@ -15,6 +15,9 @@ from .utils import (
     get_config_dir,
     get_wg_title,
     DEFAULT_MONTHS,
+    get_wg_file_cache_dir,
+    copy_if_updated,
+    get_cache_dir,
 )
 from .notebooklm import (
     get_credentials,
@@ -78,9 +81,10 @@ def merge_config_args(args: argparse.Namespace) -> None:
         val = getattr(args, key)
         # Check if it's the default value for some arguments
         is_default = False
-        if key == "destination" and val == ".":
-            is_default = True
-        elif key == "credentials_file" and val == os.path.join(
+        val = getattr(args, key)
+        # Check if it's the default value for some arguments
+        is_default = False
+        if key == "credentials_file" and val == os.path.join(
             get_config_dir(), "client_secrets.json"
         ):
             is_default = True
@@ -106,6 +110,57 @@ def merge_config_args(args: argparse.Namespace) -> None:
 
     # Save updated config
     save_config_args(args.wg, persisted)
+
+
+def export_to_notebooklm(
+    args: argparse.Namespace, cache_dir: str, verbosity: Verbosity
+) -> None:
+    """Upload cached documents to a new NotebookLM notebook."""
+    gcp_project = args.create
+    print("-" * 40)
+    print("Exporting to NotebookLM...")
+
+    creds = get_credentials(args.credentials_file, args.token_file, verbose=verbosity)
+    if not creds:
+        log("Authentication failed.", verbosity, level=LogLevel.ERROR)
+        return
+
+    wg_title = get_wg_title(args.wg)
+    notebook_title = f"IETF {wg_title} Working Group"
+    notebook_id = create_notebook(gcp_project, notebook_title, creds, verbose=verbosity)
+
+    if not notebook_id:
+        log("Failed to create notebook.", verbosity, level=LogLevel.ERROR)
+        return
+
+    success_count = 0
+    # When creating a new notebook, upload all relevant text files from the CACHE.
+    all_cache_files = [
+        os.path.join(cache_dir, f)
+        for f in os.listdir(cache_dir)
+        if f.endswith((".txt", ".md"))
+    ]
+    for file_path in sorted(list(set(all_cache_files))):
+        if upload_source(
+            gcp_project,
+            notebook_id,
+            file_path,
+            creds,
+            verbose=verbosity,
+        ):
+            success_count += 1
+
+    if success_count > 0:
+        print(
+            f"Successfully uploaded {success_count} files "
+            f"to notebook '{notebook_title}'."
+        )
+    else:
+        log(
+            "No files were uploaded to the notebook.",
+            verbosity,
+            level=LogLevel.ERROR,
+        )
 
 
 def main() -> None:
@@ -134,13 +189,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--destination",
-        default=".",
-        help="Destination folder (default: current directory)",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite resources that already exist in the destination",
+        help="Destination folder for exported documents (required on first run)",
     )
     parser.add_argument("--quiet", "-q", action="store_true", help="Only output errors")
     parser.add_argument(
@@ -167,13 +216,34 @@ def main() -> None:
         default=os.path.join(get_config_dir(), "token.json"),
         help="Path to the Google Cloud OAuth token file",
     )
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="Clear the local file cache for this Working Group and start fresh.",
+    )
 
     args = parser.parse_args()
 
     merge_config_args(args)
 
-    if not os.path.exists(args.destination):
-        os.makedirs(args.destination)
+    if not args.destination:
+        print("Error: --destination is required (either on command line or from config).")
+        print(f"Usage: ietf-notebook {args.wg} --destination ./my-docs")
+        return
+
+    # 1. Clear destination folder to ensure it only contains this run's updates
+    if os.path.exists(args.destination):
+        shutil.rmtree(args.destination)
+    os.makedirs(args.destination)
+
+    # 1. Handle --clear-cache
+    wg_cache_dir = os.path.join(get_cache_dir(), args.wg)
+    cache_dir = get_wg_file_cache_dir(args.wg)
+    if args.clear_cache:
+        log(f"Clearing cache for {args.wg}...", Verbosity.STATUS)
+        if os.path.exists(wg_cache_dir):
+            shutil.rmtree(wg_cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
 
     verbosity = Verbosity.STATUS
     if args.quiet:
@@ -184,68 +254,63 @@ def main() -> None:
     if verbosity != Verbosity.QUIET:
         print(f"Processing WG: {args.wg}")
         print(f"Destination: {args.destination}")
-        if args.force:
-            print("Force mode: overwriting existing files.")
+        if args.clear_cache:
+            print("Clear cache: Re-downloading all materials.")
         else:
-            print("Default mode: skipping existing files (except GitHub issues).")
+            print("Default mode: Using local cache for existing materials.")
         print("-" * 40)
 
-    results = []
+    # We will collect all files generated by the processors in the cache.
+    # We then mirror them to the destination.
+    generated_cache_files = []
 
     # 1. Charter
-    charter_file = os.path.join(args.destination, f"{args.wg}-charter.txt")
-    if not args.force and os.path.exists(charter_file):
-        log(
-            f"Skipping charter: {charter_file} already exists.",
-            verbosity,
-            level=LogLevel.PROGRESS,
-        )
-    else:
-        results.extend(process_charter(args.wg, charter_file, verbose=verbosity))
+    charter_file = os.path.join(cache_dir, f"{args.wg}-charter.txt")
+    generated_cache_files.extend(
+        process_charter(args.wg, charter_file, verbose=verbosity)
+    )
 
     # 2. Meetings
-    results.extend(
+    generated_cache_files.extend(
         process_meetings(
             args.wg,
-            args.destination,
-            force=args.force,
+            cache_dir,
             verbose=verbosity,
             months=args.months,
         )
     )
 
     # 3. Mailing List
-    results.extend(
+    generated_cache_files.extend(
         sync_mailing_list(
-            args.wg, args.destination, months=args.months, verbose=verbosity
+            args.wg, cache_dir, months=args.months, verbose=verbosity
         )
     )
 
     # 4. Transcripts
-    results.extend(
+    generated_cache_files.extend(
         process_transcripts(
             args.wg,
-            args.destination,
-            force=args.force,
+            cache_dir,
             verbose=verbosity,
             months=args.months,
         )
     )
 
     # 5. Documents (Drafts & RFCs)
-    results.extend(
+    generated_cache_files.extend(
         process_documents(
-            args.wg, args.destination, force=args.force, verbose=verbosity
+            args.wg, cache_dir, verbose=verbosity
         )
     )
 
     # 6. GitHub Issues
     if args.github:
-        gh_json = os.path.join(args.destination, f"{args.wg}-github-issues.json")
-        gh_txt = os.path.join(args.destination, f"{args.wg}-github-issues.txt")
-
+        gh_json = os.path.join(cache_dir, f"{args.wg}-github-issues.json")
+        gh_txt = os.path.join(cache_dir, f"{args.wg}-github-issues.txt")
         if download_github_issues(args.github, gh_json, verbose=verbosity):
-            results.extend(
+            generated_cache_files.append(gh_json)
+            generated_cache_files.extend(
                 process_github_issues(
                     gh_json,
                     gh_txt,
@@ -254,75 +319,31 @@ def main() -> None:
                     verbose=verbosity,
                 )
             )
-            try:
-                os.remove(gh_json)
-            except OSError as err:
-                log(
-                    f"Error cleaning up {gh_json}: {err}",
-                    verbosity,
-                    level=LogLevel.ERROR,
-                )
-    else:
-        log(
-            "Skip GitHub issues: no GitHub repo provided.",
-            verbosity,
-            level=LogLevel.PROGRESS,
-        )
+
+    # 7. Mirror to destination
+    updated_files = []
+    # Filter out internal JSON/binary files from mirroring to destination if appropriate
+    # but for now we mirror all returned generated files.
+    for src in sorted(list(set(generated_cache_files))):
+        if not os.path.exists(src):
+            continue
+        if src.endswith(".json"): # Don't mirror internal JSON
+            continue
+        filename = os.path.basename(src)
+        dst = os.path.join(args.destination, filename)
+        if copy_if_updated(src, dst):
+            updated_files.append(dst)
 
     if args.create:
-        gcp_project = args.create
-        print("-" * 40)
-        print("Exporting to NotebookLM...")
-
-        creds = get_credentials(
-            args.credentials_file, args.token_file, verbose=verbosity
-        )
-        if creds:
-            wg_title = get_wg_title(args.wg)
-            notebook_title = f"IETF {wg_title} Working Group"
-            notebook_id = create_notebook(
-                gcp_project, notebook_title, creds, verbose=verbosity
-            )
-
-            if notebook_id:
-                success_count = 0
-                # Filter results to include only text files for upload
-                upload_files = [f for f in results if f.endswith(".txt")]
-                for file_path in sorted(list(set(upload_files))):
-                    if upload_source(
-                        gcp_project,
-                        notebook_id,
-                        file_path,
-                        creds,
-                        verbose=verbosity,
-                    ):
-                        success_count += 1
-
-                if success_count > 0:
-                    print(
-                        f"Successfully uploaded {success_count} files "
-                        f"to notebook '{notebook_title}'."
-                    )
-                else:
-                    log(
-                        "No files were uploaded to the notebook.",
-                        verbosity,
-                        level=LogLevel.ERROR,
-                    )
-            else:
-                log("Failed to create notebook.", verbosity, level=LogLevel.ERROR)
-        else:
-            log("Authentication failed.", verbosity, level=LogLevel.ERROR)
+        export_to_notebooklm(args, cache_dir, verbosity)
 
     if verbosity != Verbosity.QUIET:
         print("-" * 40)
+        if updated_files:
+            print(f"Updated {len(updated_files)} files in {args.destination}.")
+        else:
+            print("No files updated in destination.")
         print("All tasks completed.")
-
-    if results:
-        print("\n## Updated Resources")
-        for res in sorted(list(set(results))):
-            rel_path = os.path.relpath(res, os.getcwd())
-            print(f"- {rel_path}")
 
 
 if __name__ == "__main__":

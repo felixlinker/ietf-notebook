@@ -92,7 +92,6 @@ def get_meeting_links(
 def process_meetings(
     wg_name: str,
     destination: str,
-    force: bool = False,
     verbose: Verbosity = Verbosity.STATUS,
     months: Optional[int] = None,
 ) -> List[str]:
@@ -120,7 +119,7 @@ def process_meetings(
         output_file = os.path.join(destination, f"{safe_num}-minutes.md")
 
         # Check if we already have files for this meeting to avoid extra requests
-        if not force and os.path.exists(output_file):
+        if os.path.exists(output_file):
             log(
                 f"Skipping meeting {meeting['number']}: already downloaded.",
                 verbose,
@@ -139,7 +138,7 @@ def process_meetings(
         for link in meeting["links"]:
             # 1. Look for and download PDFs from any meeting pages
             updated_files.extend(
-                _handle_pdfs(link["url"], destination, safe_num, force, verbose)
+                _handle_pdfs(link["url"], destination, safe_num, verbose)
             )
 
             # 2. Extract minutes text
@@ -173,7 +172,7 @@ def process_meetings(
 
 
 def _handle_pdfs(
-    url: str, dest: str, safe_num: str, force: bool, verbose: Verbosity
+    url: str, dest: str, safe_num: str, verbose: Verbosity
 ) -> List[str]:
     """Crawl a URL for PDF slide links and download them."""
     log(f"Checking for PDFs at {url}...", verbose, level=LogLevel.PROGRESS)
@@ -207,7 +206,7 @@ def _handle_pdfs(
             p_base += ".pdf"
 
         pdf_dest = os.path.join(dest, f"{safe_num}-{p_base}")
-        if force or not os.path.exists(pdf_dest):
+        if not os.path.exists(pdf_dest):
             if _download_if_pdf(p_url, pdf_dest, verbose):
                 updated.append(pdf_dest)
     return updated
