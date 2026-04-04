@@ -6,6 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 
 DEFAULT_HEADERS = {"User-Agent": "ietf-notebook/0.1.0"}
+DEFAULT_MONTHS = 12
 
 
 def get_config_dir() -> str:

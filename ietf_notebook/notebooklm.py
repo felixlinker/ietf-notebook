@@ -59,13 +59,20 @@ def get_credentials(
             with open(token_path, "w", encoding="utf-8") as token_fh:
                 token_fh.write(creds.to_json())
         except (IOError, ValueError) as err:
-            log(f"Warning: Could not save token: {err}", verbose, level=LogLevel.PROGRESS)
+            log(
+                f"Warning: Could not save token: {err}",
+                verbose,
+                level=LogLevel.PROGRESS,
+            )
 
     return creds if creds else None
 
 
 def create_notebook(
-    project_id: str, title: str, creds: Credentials, verbose: Verbosity = Verbosity.STATUS
+    project_id: str,
+    title: str,
+    creds: Credentials,
+    verbose: Verbosity = Verbosity.STATUS,
 ) -> Optional[str]:
     """Create a new notebook in NotebookLM Enterprise."""
     location = "us"

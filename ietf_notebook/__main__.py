@@ -8,7 +8,14 @@ from .meetings import process_meetings
 from .charter import process_charter
 from .drafts import process_documents
 from .transcripts import process_transcripts
-from .utils import Verbosity, LogLevel, log, get_config_dir, get_wg_title
+from .utils import (
+    Verbosity,
+    LogLevel,
+    log,
+    get_config_dir,
+    get_wg_title,
+    DEFAULT_MONTHS,
+)
 from .notebooklm import (
     get_credentials,
     create_notebook,
@@ -63,6 +70,7 @@ def merge_config_args(args: argparse.Namespace) -> None:
         "create",
         "credentials_file",
         "token_file",
+        "months",
     ]
     persistable_lists = ["github_label", "exclude_github_label"]
 
@@ -76,7 +84,11 @@ def merge_config_args(args: argparse.Namespace) -> None:
             get_config_dir(), "client_secrets.json"
         ):
             is_default = True
-        elif key == "token_file" and val == os.path.join(get_config_dir(), "token.json"):
+        elif key == "token_file" and val == os.path.join(
+            get_config_dir(), "token.json"
+        ):
+            is_default = True
+        elif key == "months" and val == DEFAULT_MONTHS:
             is_default = True
 
         if (val is None or is_default) and key in persisted:
@@ -107,8 +119,8 @@ def main() -> None:
     parser.add_argument(
         "--months",
         type=int,
-        default=12,
-        help="Number of months of mailing list archives and meetings to fetch (default: 12)",
+        default=DEFAULT_MONTHS,
+        help=f"Number of months of materials and emails to fetch (default: {DEFAULT_MONTHS})",
     )
     parser.add_argument(
         "--github-label",
