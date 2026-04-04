@@ -48,9 +48,20 @@ def get_meeting_links(
         if not cells:
             continue
 
+        # Extraction: Use 'data-start-utc' if available in a span, otherwise text
+        date_cell = cells[1]
+        date_text = date_cell.get_text(strip=True)
+        if not date_text:
+            # Fallback to data-start-utc attribute if present (common for JS-populated fields)
+            span = date_cell.find("span", attrs={"data-start-utc": True})
+            if isinstance(span, Tag):
+                attr_val = span.get("data-start-utc")
+                if isinstance(attr_val, str):
+                    date_text = attr_val
+
         meeting_info: Dict[str, Any] = {
             "number": cells[0].get_text(strip=True),
-            "date": cells[1].get_text(strip=True) if len(cells) > 1 else "",
+            "date": date_text,
             "links": [],
         }
 

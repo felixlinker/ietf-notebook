@@ -205,7 +205,13 @@ def main() -> None:
 
     # 2. Meetings
     results.extend(
-        process_meetings(args.wg, args.destination, force=args.force, verbose=verbosity)
+        process_meetings(
+            args.wg,
+            args.destination,
+            force=args.force,
+            verbose=verbosity,
+            months=args.months,
+        )
     )
 
     # 3. Mailing List
@@ -218,7 +224,11 @@ def main() -> None:
     # 4. Transcripts
     results.extend(
         process_transcripts(
-            args.wg, args.destination, force=args.force, verbose=verbosity
+            args.wg,
+            args.destination,
+            force=args.force,
+            verbose=verbosity,
+            months=args.months,
         )
     )
 

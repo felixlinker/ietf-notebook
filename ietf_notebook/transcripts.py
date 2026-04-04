@@ -1,7 +1,7 @@
 import os
 import subprocess
-from typing import List
-
+from datetime import datetime, timedelta
+from typing import List, Optional
 from .utils import LogLevel, Verbosity, log, get_cache_dir
 
 
@@ -10,6 +10,7 @@ def process_transcripts(
     destination: str,
     force: bool = False,
     verbose: Verbosity = Verbosity.STATUS,
+    months: Optional[int] = None,
 ) -> List[str]:
     """
     Fetch transcripts for a WG from the ietf-minutes-data repo and write to destination.
@@ -55,11 +56,27 @@ def process_transcripts(
 
     # WG name in the filename is uppercase in the repo (e.g., AIPREF)
     wg_upper = wg_name.upper()
+    cutoff_date = (
+        datetime.now() - timedelta(days=months * 30) if months is not None else None
+    )
 
     for file in os.listdir(transcripts_path):
         # Pattern: IETF{num}-{WG}-{date}-{time}.md
         # Example: IETF125-AIPREF-20260316-0330.md
         if file.startswith("IETF") and f"-{wg_upper}-" in file and file.endswith(".md"):
+            # Filtering by date if requested
+            if cutoff_date:
+                try:
+                    parts = file.split("-")
+                    # parts[2] should be the date YYYYMMDD
+                    date_str = parts[2]
+                    file_date = datetime.strptime(date_str, "%Y%m%d")
+                    if file_date < cutoff_date:
+                        continue
+                except (IndexError, ValueError):
+                    # If parsing fails, fall back to including it
+                    pass
+
             src_path = os.path.join(transcripts_path, file)
 
             # Destination filename: lowercase and append -transcript
