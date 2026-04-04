@@ -6,7 +6,7 @@ import imaplib
 import os
 import re
 from datetime import datetime, timedelta
-from email.message import EmailMessage
+from email.message import EmailMessage, MIMEPart
 from typing import List, Optional, Dict
 
 from .utils import LogLevel, Verbosity, get_mailing_list_name, log, get_cache_dir
@@ -23,22 +23,40 @@ def extract_text_content(msg: EmailMessage) -> str:
     try:
         body_part = msg.get_body(preferencelist=("plain",))
         if body_part:
-            part_content = body_part.get_content()
-            return str(part_content) if part_content is not None else ""
-    except (AttributeError, ValueError, TypeError):
+            return _decode_safely(body_part)
+    except (AttributeError, ValueError, TypeError, LookupError):
         pass
 
     # Fallback to manual walk for edge cases
     body = ""
     for part in msg.walk():
         if part.get_content_type() == "text/plain" and part.get_filename() is None:
-            try:
-                content = part.get_content()
-                if isinstance(content, str):
-                    body += content
-            except (AttributeError, ValueError, TypeError):
-                pass
+            if isinstance(part, EmailMessage):
+                body += _decode_safely(part)
     return body
+
+
+def _decode_safely(part: MIMEPart) -> str:
+    """Attempt to decode plain text from an EmailMessage part safely."""
+    try:
+        # High-level API
+        content = part.get_content()
+        return str(content) if content is not None else ""
+    except (AttributeError, ValueError, TypeError, LookupError):
+        # Fallback: get raw bytes and decode manually with common fallbacks
+        try:
+            payload = part.get_payload(decode=True)
+            if not isinstance(payload, bytes):
+                return ""
+            # Try some common charsets with 'replace' error handling
+            for charset in ["utf-8", "latin-1", "ascii"]:
+                try:
+                    return payload.decode(charset, errors="replace")
+                except (ValueError, LookupError):
+                    continue
+            return payload.decode("ascii", errors="replace")
+        except (AttributeError, ValueError, TypeError, LookupError):
+            return ""
 
 
 def clean_email_text(text: str) -> str:
