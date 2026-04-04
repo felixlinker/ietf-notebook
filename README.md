@@ -13,11 +13,14 @@ pipx install ietf-notebook
 ## Usage
 
 ```bash
-ietf-notebook [wg_shortname] _OPTIONS_
+ietf-notebook [OPTIONS] wg_shortname
 ```
+
+`ietf-notebook` persists Working Group configuration options. Once set, you don't need to specify them again for that Working Group. Use `--clear-config` to reset a group's configuration.
 
 ### Options
 
+Working Group-specific:
 - `wg_shortname`: IETF Working Group short name (e.g., `httpbis`).
 - `--destination`: Folder to save files in (default: current directory).
 - `--github`: GitHub org/repo for issues (e.g., `ietf-wg-httpbis/wg-materials`).
@@ -26,22 +29,12 @@ ietf-notebook [wg_shortname] _OPTIONS_
 - `--months`: Number of months of mailing list history to fetch (default: 12).
 - `--create`: See "NotebookLM Export" below.
 - `--clear-config`: Clear the persisted configuration for this Working Group.
+
+General options:
 - `--force`: Force re-downloading of existing files. By default, the tool skips files that already exist in the destination.
 - `--quiet`: No messages except for errors and the final resource summary.
 - `--verbose`: Detailed progress reporting.
 
-### Configuration Persistence
-
-To make long-term use easier, `ietf-notebook` persists certain configuration options per Working Group in `~/.config/ietf-notebook/{wg_name}/config.json`. 
-
-The following options are saved:
-- `--github`
-- `--destination`
-- `--github-label` and `--exclude-github-label`
-- `--create` (GCP Project ID)
-- `--credentials-file` and `--token-file`
-
-Once set, you don't need to specify them again for that Working Group. Use `--clear-config` to reset a group's configuration.
 
 ### Default Behavior
 
