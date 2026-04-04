@@ -3,7 +3,7 @@ import re
 from enum import Enum
 from typing import Optional, Dict
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 DEFAULT_HEADERS = {"User-Agent": "ietf-notebook/0.1.0"}
 DEFAULT_MONTHS = 12
@@ -27,9 +27,9 @@ def get_cache_dir() -> str:
 
 def get_mailing_list_name(wg_name: str) -> str:
     """
-    Find the mailing list name from the WG 'about' page.
+    Find the mailing list name from the group 'about' page.
     """
-    url = f"https://datatracker.ietf.org/wg/{wg_name}/about/"
+    url = f"https://datatracker.ietf.org/group/{wg_name}/about/"
     res = fetch_resource(url)
     if not res:
         return wg_name
@@ -47,7 +47,7 @@ def get_mailing_list_name(wg_name: str) -> str:
         href_val = archive_link.get("href")
         if (
             isinstance(href_val, str)
-            and "mailarchive.ietf.org/arch/browse/" in href_val
+            and ("mailarchive.ietf.org/arch/browse/" in href_val or "mailman.irtf.org" in href_val)
         ):
             parts = href_val.strip("/").split("/")
             return parts[-1]
@@ -64,6 +64,35 @@ def get_mailing_list_name(wg_name: str) -> str:
                     return str(email.split("@")[0])
 
     return wg_name
+
+
+def get_group_type(wg_name: str) -> str:
+    """
+    Identify if the acronym is for a Working Group ('ietf') or Research Group ('irtf').
+    """
+    url = f"https://datatracker.ietf.org/group/{wg_name}/about/"
+    res = fetch_resource(url)
+    if not res:
+        return "ietf"  # Default to ietf
+
+    bs_soup = BeautifulSoup(res.text, "html.parser")
+    # Strategy: look for 'WG' or 'RG' in the summary table
+    table = bs_soup.find("table", class_="table-sm")
+    if isinstance(table, Tag):
+        first_td = table.find("td")
+        if isinstance(first_td, Tag):
+            text = first_td.get_text(strip=True)
+            if text == "RG":
+                return "irtf"
+            if text == "WG":
+                return "ietf"
+
+    # Fallback: check for charter link pattern if table strategy fails
+    charter_link = bs_soup.find("a", href=re.compile(r"/doc/charter-irtf-"))
+    if charter_link:
+        return "irtf"
+
+    return "ietf"
 
 
 class Verbosity(Enum):

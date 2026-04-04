@@ -2,14 +2,14 @@ import os
 import re
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from .utils import LogLevel, Verbosity, log, fetch_resource
+from .utils import LogLevel, Verbosity, log, fetch_resource, get_group_type
 
 
 def get_wg_documents(
     wg_name: str, verbose: Verbosity = Verbosity.STATUS
 ) -> Dict[str, List[Dict[str, Any]]]:
     """Scrape WG documents page for drafts and RFCs."""
-    url = f"https://datatracker.ietf.org/wg/{wg_name}/documents/"
+    url = f"https://datatracker.ietf.org/group/{wg_name}/documents/"
     log(f"Finding documents for {wg_name}...", verbose, level=LogLevel.STATUS)
     res = fetch_resource(url)
     if not res:
@@ -20,7 +20,9 @@ def get_wg_documents(
     rfcs: List[Dict[str, Any]] = []
 
     # Patterns
-    draft_pattern = f"/doc/draft-ietf-{wg_name}-"
+    group_type = get_group_type(wg_name)
+    prefix = f"draft-{group_type}-{wg_name}-"
+    draft_pattern = f"/doc/{prefix}"
 
     for a_tag in soup.find_all("a", href=True):
         href = a_tag.get("href")
@@ -40,7 +42,7 @@ def get_wg_documents(
             text = a_tag.get_text(strip=True)
             # Text usually looks like "draft-ietf-wg-name-something-05"
             match = re.search(
-                r"(draft-ietf-" + re.escape(wg_name) + r"-.*?)-(\d+)$", text
+                r"(" + re.escape(prefix) + r".*?)-(\d+)$", text
             )
             if match:
                 draft_name = match.group(1)

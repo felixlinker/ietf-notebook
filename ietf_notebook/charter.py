@@ -1,13 +1,14 @@
 from typing import List
 from bs4 import BeautifulSoup
-from .utils import Verbosity, LogLevel, clean_html, fetch_resource, log
+from .utils import Verbosity, LogLevel, clean_html, fetch_resource, log, get_group_type
 
 
 def process_charter(
     wg_name: str, output_file: str, verbose: Verbosity = Verbosity.STATUS
 ) -> List[str]:
     """Fetch the WG charter and write to output_file. Returns list of updated files."""
-    url = f"https://datatracker.ietf.org/doc/charter-ietf-{wg_name}/"
+    group_type = get_group_type(wg_name)
+    url = f"https://datatracker.ietf.org/doc/charter-{group_type}-{wg_name}/"
     log(f"Fetching charter for {wg_name}...", verbose, level=LogLevel.STATUS)
 
     # Try fetching as markdown first

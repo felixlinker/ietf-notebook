@@ -22,7 +22,7 @@ def get_meeting_links(
     wg_name: str, verbose: Verbosity = Verbosity.STATUS
 ) -> List[Dict[str, Any]]:
     """Crawl meeting materials page and return list of primary links to minutes and materials."""
-    url = f"https://datatracker.ietf.org/wg/{wg_name}/meetings/"
+    url = f"https://datatracker.ietf.org/group/{wg_name}/meetings/"
     log(f"Crawling meeting materials for {wg_name}...", verbose, level=LogLevel.STATUS)
     html = fetch_url(url)
     if not html:
