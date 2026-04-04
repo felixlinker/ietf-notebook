@@ -15,15 +15,15 @@ def process_transcripts(
     Fetch transcripts for a WG from the ietf-minutes-data repo and write to destination.
     """
     repo_url = "https://github.com/ietf-minutes/ietf-minutes-data.git"
-    cache_dir = os.path.join(get_cache_dir(), "transcript-cache", wg_name)
+    repo_dir = os.path.join(get_cache_dir(), "transcripts-repo")
     branch = "cache"
 
     # 1. Sync the repo
-    if not os.path.exists(cache_dir):
+    if not os.path.exists(repo_dir):
         log(f"Cloning {repo_url} (branch {branch})...", verbose, level=LogLevel.STATUS)
         try:
             subprocess.run(
-                ["git", "clone", "-b", branch, "--depth", "1", repo_url, cache_dir],
+                ["git", "clone", "-b", branch, "--depth", "1", repo_url, repo_dir],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -35,7 +35,7 @@ def process_transcripts(
         log("Updating transcripts repo...", verbose, level=LogLevel.PROGRESS)
         try:
             subprocess.run(
-                ["git", "-C", cache_dir, "pull", "origin", branch],
+                ["git", "-C", repo_dir, "pull", "origin", branch],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -47,10 +47,10 @@ def process_transcripts(
     # 2. Find transcripts for the WG
     # The repo structure is: transcripts/IETF{num}-{WG}-{date}-{time}.md
     updated_files = []
-    transcripts_path = os.path.join(cache_dir, "transcripts")
+    transcripts_path = os.path.join(repo_dir, "transcripts")
 
     if not os.path.exists(transcripts_path):
-        log(f"Transcripts directory not found in {cache_dir}", level=LogLevel.ERROR)
+        log(f"Transcripts directory not found in {repo_dir}", level=LogLevel.ERROR)
         return []
 
     # WG name in the filename is uppercase in the repo (e.g., AIPREF)
