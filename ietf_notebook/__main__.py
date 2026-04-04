@@ -1,5 +1,7 @@
 import argparse
+import json
 import os
+import shutil
 from .mbox import sync_mailing_list
 from .github import download_github_issues, process_github_issues
 from .meetings import process_meetings
@@ -14,6 +16,86 @@ from .notebooklm import (
 )
 
 
+def load_config_args(wg_name: str) -> dict:
+    """Load persisted arguments for a Working Group."""
+    config_file = os.path.join(get_config_dir(), wg_name, "config.json")
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as file_handle:
+                return dict(json.load(file_handle))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def save_config_args(wg_name: str, args: dict) -> None:
+    """Save arguments for a Working Group."""
+    wg_config_dir = os.path.join(get_config_dir(), wg_name)
+    os.makedirs(wg_config_dir, exist_ok=True)
+    config_file = os.path.join(wg_config_dir, "config.json")
+    try:
+        with open(config_file, "w", encoding="utf-8") as file_handle:
+            json.dump(args, file_handle, indent=2)
+    except OSError as err:
+        log(f"Error saving config: {err}", level=LogLevel.ERROR)
+
+
+def merge_config_args(args: argparse.Namespace) -> None:
+    """Merge and persist configuration arguments."""
+    # Handle --clear-config
+    if args.clear_config:
+        wg_config_dir = os.path.join(get_config_dir(), args.wg)
+        if os.path.exists(wg_config_dir):
+            if not getattr(args, "quiet", False):
+                print(f"Clearing configuration for {args.wg}...")
+            shutil.rmtree(wg_config_dir)
+
+    # Load and merge config
+    persisted = load_config_args(args.wg)
+
+    # Persistence logic:
+    # 1. Scalars: CLI overrides persisted. If not in CLI, use persisted.
+    # 2. Lists: CLI extends persisted.
+
+    persistable_scalars = [
+        "github",
+        "destination",
+        "create",
+        "credentials_file",
+        "token_file",
+    ]
+    persistable_lists = ["github_label", "exclude_github_label"]
+
+    for key in persistable_scalars:
+        val = getattr(args, key)
+        # Check if it's the default value for some arguments
+        is_default = False
+        if key == "destination" and val == ".":
+            is_default = True
+        elif key == "credentials_file" and val == os.path.join(
+            get_config_dir(), "client_secrets.json"
+        ):
+            is_default = True
+        elif key == "token_file" and val == os.path.join(get_config_dir(), "token.json"):
+            is_default = True
+
+        if (val is None or is_default) and key in persisted:
+            setattr(args, key, persisted[key])
+        elif val is not None and not is_default:
+            persisted[key] = val
+
+    for key in persistable_lists:
+        cli_vals = getattr(args, key) or []
+        persisted_vals = persisted.get(key, [])
+        combined = list(set(persisted_vals + cli_vals))
+        setattr(args, key, combined if combined else None)
+        if combined:
+            persisted[key] = combined
+
+    # Save updated config
+    save_config_args(args.wg, persisted)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Automate creation of NotebookLM-ready documents for an IETF Working Group."
@@ -25,8 +107,8 @@ def main() -> None:
     parser.add_argument(
         "--months",
         type=int,
-        default=None,
-        help="Number of months of mailing list archives to fetch (default: all)",
+        default=12,
+        help="Number of months of mailing list archives and meetings to fetch (default: 12)",
     )
     parser.add_argument(
         "--github-label",
@@ -59,6 +141,11 @@ def main() -> None:
         help="Upload the generated files to a new notebook in NotebookLM",
     )
     parser.add_argument(
+        "--clear-config",
+        action="store_true",
+        help="Clear the persisted configuration for this Working Group",
+    )
+    parser.add_argument(
         "--credentials-file",
         default=os.path.join(get_config_dir(), "client_secrets.json"),
         help="Path to the Google Cloud OAuth client secrets file",
@@ -71,8 +158,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.create and not args.gcp_project:
-        parser.error("--gcp-project is required when using --create")
+    merge_config_args(args)
 
     if not os.path.exists(args.destination):
         os.makedirs(args.destination)
