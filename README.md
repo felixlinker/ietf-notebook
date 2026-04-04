@@ -45,7 +45,7 @@ ietf-notebook _wg_shortname_
 
 Working Group-specific:
 - `wg_shortname`: IETF Working Group short name (e.g., `httpbis`).
-- `--destination`: Folder for mirrored records (required on first run; then persisted).
+- `--destination`: Folder to populate with group records (NOTE: contents will be deleted on each run).
 - `--github`: GitHub org/repo for issues (e.g., `ietf-wg-httpbis/wg-materials`).
 - `--github-label`: Include only GitHub issues with this label (can be specified multiple times).
 - `--exclude-github-label`: Exclude GitHub issues with this label (can be specified multiple times).
