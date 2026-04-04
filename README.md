@@ -23,11 +23,25 @@ ietf-notebook [wg_shortname] _OPTIONS_
 - `--github`: GitHub org/repo for issues (e.g., `ietf-wg-httpbis/wg-materials`).
 - `--github-label`: Include only GitHub issues with this label (can be specified multiple times).
 - `--exclude-github-label`: Exclude GitHub issues with this label (can be specified multiple times).
-- `--months`: Number of months of mailing list history to fetch (default: all).
+- `--months`: Number of months of mailing list history to fetch (default: 12).
 - `--create`: See "NotebookLM Export" below.
+- `--clear-config`: Clear the persisted configuration for this Working Group.
 - `--force`: Force re-downloading of existing files. By default, the tool skips files that already exist in the destination.
 - `--quiet`: No messages except for errors and the final resource summary.
 - `--verbose`: Detailed progress reporting.
+
+### Configuration Persistence
+
+To make long-term use easier, `ietf-notebook` persists certain configuration options per Working Group in `~/.config/ietf-notebook/{wg_name}/config.json`. 
+
+The following options are saved:
+- `--github`
+- `--destination`
+- `--github-label` and `--exclude-github-label`
+- `--create` (GCP Project ID)
+- `--credentials-file` and `--token-file`
+
+Once set, you don't need to specify them again for that Working Group. Use `--clear-config` to reset a group's configuration.
 
 ### Default Behavior
 
