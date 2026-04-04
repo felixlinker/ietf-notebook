@@ -24,7 +24,6 @@ dependencies = [
 [project.optional-dependencies]
 certs = ["pip-system-certs"]
 dev = [
-    "pip-system-certs",
     "mypy",
     "black",
     "pylint",
