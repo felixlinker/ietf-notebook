@@ -10,6 +10,14 @@ This tool gathers Working Group charters, drafts, meeting minutes, PDF slides, m
 pipx install ietf-notebook
 ```
 
+### Certificate Errors
+
+If you encounter SSL or certificate errors (common behind corporate firewalls), install with the `certs` option:
+
+```bash
+pipx install ietf-notebook[certs]
+```
+
 ## Usage
 
 ### First Run
