@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -49,6 +50,7 @@ def get_meeting_links(
 
         meeting_info: Dict[str, Any] = {
             "number": cells[0].get_text(strip=True),
+            "date": cells[1].get_text(strip=True) if len(cells) > 1 else "",
             "links": [],
         }
 
@@ -81,6 +83,7 @@ def process_meetings(
     destination: str,
     force: bool = False,
     verbose: Verbosity = Verbosity.STATUS,
+    months: Optional[int] = None,
 ) -> List[str]:
     """Fetch meeting minutes and materials and write to destination."""
     updated_files = []
@@ -91,16 +94,36 @@ def process_meetings(
         )
         return []
 
+    # Filter meetings by date if months is specified
+    if months is not None:
+        cutoff_date = datetime.now() - timedelta(days=months * 30)
+        filtered_meetings = []
+        for meeting in meetings:
+            m_date = _parse_meeting_date(meeting["date"], meeting["number"])
+            if m_date and m_date >= cutoff_date:
+                filtered_meetings.append(meeting)
+        meetings = filtered_meetings
+
     for meeting in meetings:
         safe_num = format_filename(meeting["number"]).replace("_", "").replace("-", "")
         output_file = os.path.join(destination, f"{safe_num}-minutes.md")
-        content_needed = force or not os.path.exists(output_file)
+
+        # Check if we already have files for this meeting to avoid extra requests
+        if not force and os.path.exists(output_file):
+            log(
+                f"Skipping meeting {meeting['number']}: already downloaded.",
+                verbose,
+                level=LogLevel.PROGRESS,
+            )
+            continue
 
         meeting_text_parts = []
-        if content_needed:
-            meeting_text_parts.append(
-                f"# Meeting Materials for IETF {meeting['number']} ({wg_name})\n\n"
-            )
+        meeting_text_parts.append(
+            f"# Meeting Materials for IETF {meeting['number']} ({wg_name})\n"
+        )
+        if meeting.get("date"):
+            meeting_text_parts.append(f"Date: {meeting['date']}\n")
+        meeting_text_parts.append("\n")
 
         for link in meeting["links"]:
             # 1. Look for and download PDFs from any meeting pages
@@ -108,15 +131,15 @@ def process_meetings(
                 _handle_pdfs(link["url"], destination, safe_num, force, verbose)
             )
 
-            # 2. Extract minutes text if needed
-            if link["type"] == "minutes" and content_needed:
+            # 2. Extract minutes text
+            if link["type"] == "minutes":
                 content = _extract_minutes_content(link["url"], verbose)
                 if content:
                     meeting_text_parts.append(f"## {link['type'].capitalize()}\n")
                     meeting_text_parts.append(f"URL: {link['url']}\n\n")
                     meeting_text_parts.append(content + "\n\n---\n\n")
 
-        if content_needed and len(meeting_text_parts) > 1:
+        if len(meeting_text_parts) > 1:
             total_text = "".join(meeting_text_parts)
             if len(total_text.strip()) > 150:
                 log(f"Writing {output_file}...", verbose, level=LogLevel.PROGRESS)
@@ -245,3 +268,35 @@ def _extract_minutes_content(url: str, verbose: Verbosity) -> Optional[str]:
     body_div = soup.find("div", class_="card-body")
     final_text = clean_html(str(body_div)) if body_div else clean_html(res.text)
     return str(final_text) if final_text else None
+
+
+def _parse_meeting_date(date_str: str, meeting_num: str) -> Optional[datetime]:
+    """Parse meeting date from string or estimate based on meeting number."""
+    if date_str:
+        try:
+            # Example: 2026-03-20 12:00-14:00 AEDT
+            # We only care about YYYY-MM-DD
+            ymd = date_str.split(" ")[0]
+            return datetime.strptime(ymd, "%Y-%m-%d")
+        except (ValueError, IndexError):
+            pass
+
+    # Fallback to estimation based on IETF meeting number
+    # IETF 125 is March 2026
+    # IETF 124 is Nov 2025
+    match = re.search(r"IETF\s*(\d+)", meeting_num, re.I)
+    if match:
+        num = int(match.group(1))
+        # Base: IETF 125 = March 2026
+        diff = num - 125
+        # 3 meetings per year
+        # 125: year 2026, month 3
+        # 124: year 2025, month 11 (3 - 4 = -1 -> 11)
+        # 123: year 2025, month 7 (11 - 4 = 7)
+        # 122: year 2025, month 3 (7 - 4 = 3)
+        total_months = diff * 4
+        year_diff = (3 + total_months - 1) // 12
+        new_month = (3 + total_months - 1) % 12 + 1
+        return datetime(2026 + year_diff, new_month, 1)
+
+    return None
