@@ -34,7 +34,7 @@ Then, upload all of the files in _destination_ to NotebookLM.
 
 ### Subsequent Updates
 
-To update the documents, run the same command again. `ietf-notebook` will only download files that have changed since the last run. Then, upload the new and updated files to NotebookLM.
+To update the documents, run the same command again. _destination_ will only contain files that have changed since the last run. Upload the new and updated files to NotebookLM.
 
 ```bash
 ietf-notebook _wg_shortname_
