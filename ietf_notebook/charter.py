@@ -66,7 +66,11 @@ def process_charter(
         if os.path.exists(output_file):
             with open(output_file, "r", encoding="utf-8") as in_fh:
                 if in_fh.read() == new_content:
-                    log(f"Charter for {wg_name} is unchanged.", verbose, level=LogLevel.PROGRESS)
+                    log(
+                        f"Charter for {wg_name} is unchanged.",
+                        verbose,
+                        level=LogLevel.PROGRESS,
+                    )
                     return []
 
         with open(output_file, "w", encoding="utf-8") as out_fh:

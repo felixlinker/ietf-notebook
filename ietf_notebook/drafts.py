@@ -41,9 +41,7 @@ def get_wg_documents(
         if draft_pattern in href:
             text = a_tag.get_text(strip=True)
             # Text usually looks like "draft-ietf-wg-name-something-05"
-            match = re.search(
-                r"(" + re.escape(prefix) + r".*?)-(\d+)$", text
-            )
+            match = re.search(r"(" + re.escape(prefix) + r".*?)-(\d+)$", text)
             if match:
                 draft_name = match.group(1)
                 try:

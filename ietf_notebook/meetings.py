@@ -171,9 +171,7 @@ def process_meetings(
     return updated_files
 
 
-def _handle_pdfs(
-    url: str, dest: str, safe_num: str, verbose: Verbosity
-) -> List[str]:
+def _handle_pdfs(url: str, dest: str, safe_num: str, verbose: Verbosity) -> List[str]:
     """Crawl a URL for PDF slide links and download them."""
     log(f"Checking for PDFs at {url}...", verbose, level=LogLevel.PROGRESS)
     res = fetch_resource(url)

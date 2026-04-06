@@ -71,9 +71,9 @@ def get_mailing_list_name(wg_name: str) -> str:
 
     if archive_link:
         href_val = archive_link.get("href")
-        if (
-            isinstance(href_val, str)
-            and ("mailarchive.ietf.org/arch/browse/" in href_val or "mailman.irtf.org" in href_val)
+        if isinstance(href_val, str) and (
+            "mailarchive.ietf.org/arch/browse/" in href_val
+            or "mailman.irtf.org" in href_val
         ):
             parts = href_val.strip("/").split("/")
             return parts[-1]
