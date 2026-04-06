@@ -68,14 +68,13 @@ def merge_config_args(args: argparse.Namespace) -> None:
     # 2. Lists: CLI extends persisted.
 
     persistable_scalars = [
-        "github",
         "destination",
         "create",
         "credentials_file",
         "token_file",
         "months",
     ]
-    persistable_lists = ["github_label", "exclude_github_label"]
+    persistable_lists = ["github", "github_label", "exclude_github_label"]
 
     for key in persistable_scalars:
         val = getattr(args, key)
@@ -103,6 +102,9 @@ def merge_config_args(args: argparse.Namespace) -> None:
     for key in persistable_lists:
         cli_vals = getattr(args, key) or []
         persisted_vals = persisted.get(key, [])
+        # Migration: if single string, convert to list
+        if isinstance(persisted_vals, str):
+            persisted_vals = [persisted_vals]
         combined = list(set(persisted_vals + cli_vals))
         setattr(args, key, combined if combined else None)
         if combined:
@@ -169,7 +171,9 @@ def main() -> None:
     )
     parser.add_argument("wg", help="IETF Working Group short name (e.g., 'httpbis')")
     parser.add_argument(
-        "--github", help="GitHub owner/repo (e.g., 'ietf-wg-httpbis/wg-materials')"
+        "--github",
+        action="append",
+        help="GitHub owner/repo, can be specified multiple times",
     )
     parser.add_argument(
         "--months",
@@ -227,7 +231,9 @@ def main() -> None:
     merge_config_args(args)
 
     if not args.destination:
-        print("Error: --destination is required (either on command line or from config).")
+        print(
+            "Error: --destination is required (either on command line or from config)."
+        )
         print(f"Usage: ietf-notebook {args.wg} --destination ./my-docs")
         return
 
@@ -282,9 +288,7 @@ def main() -> None:
 
     # 3. Mailing List
     generated_cache_files.extend(
-        sync_mailing_list(
-            args.wg, cache_dir, months=args.months, verbose=verbosity
-        )
+        sync_mailing_list(args.wg, cache_dir, months=args.months, verbose=verbosity)
     )
 
     # 4. Transcripts
@@ -299,26 +303,32 @@ def main() -> None:
 
     # 5. Documents (Drafts & RFCs)
     generated_cache_files.extend(
-        process_documents(
-            args.wg, cache_dir, verbose=verbosity
-        )
+        process_documents(args.wg, cache_dir, verbose=verbosity)
     )
 
     # 6. GitHub Issues
     if args.github:
-        gh_json = os.path.join(cache_dir, f"{args.wg}-github-issues.json")
-        gh_txt = os.path.join(cache_dir, f"{args.wg}-github-issues.txt")
-        if download_github_issues(args.github, gh_json, verbose=verbosity):
-            generated_cache_files.append(gh_json)
-            generated_cache_files.extend(
-                process_github_issues(
-                    gh_json,
-                    gh_txt,
-                    include_labels=args.github_label,
-                    exclude_labels=args.exclude_github_label,
-                    verbose=verbosity,
+        for repo_short in args.github:
+            # Create a slug for the repository name (handle both owner/repo and absolute URLs)
+            if repo_short.startswith("http"):
+                repo_slug = repo_short.split("/")[-1].replace(".json", "")
+            else:
+                repo_slug = repo_short.replace("/", "-")
+
+            gh_json = os.path.join(cache_dir, f"{args.wg}-github-{repo_slug}.json")
+            gh_txt = os.path.join(cache_dir, f"{args.wg}-github-{repo_slug}.txt")
+
+            if download_github_issues(repo_short, gh_json, verbose=verbosity):
+                generated_cache_files.append(gh_json)
+                generated_cache_files.extend(
+                    process_github_issues(
+                        gh_json,
+                        gh_txt,
+                        include_labels=args.github_label,
+                        exclude_labels=args.exclude_github_label,
+                        verbose=verbosity,
+                    )
                 )
-            )
 
     # 7. Mirror to destination
     updated_files = []
@@ -327,7 +337,7 @@ def main() -> None:
     for src in sorted(list(set(generated_cache_files))):
         if not os.path.exists(src):
             continue
-        if src.endswith(".json"): # Don't mirror internal JSON
+        if src.endswith(".json"):  # Don't mirror internal JSON
             continue
         filename = os.path.basename(src)
         dst = os.path.join(args.destination, filename)
