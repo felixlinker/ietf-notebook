@@ -34,25 +34,30 @@ Then, upload all of the files in _destination_ to NotebookLM.
 
 ### Subsequent Updates
 
-To update the documents, run the same command again. _destination_ will only contain files that have changed since the last run. Upload the new and updated files to NotebookLM.
+To update the documents, run with the --update flag.
 
 ```bash
-ietf-notebook _wg_shortname_
+ietf-notebook --update _wg_shortname_
 ```
+
+ _destination_ will only contain files that have changed since the last run. Upload the new and updated files to NotebookLM.
 
 
 ### Options
 
-Working Group-specific:
+Working Group configuration:
 - `wg_shortname`: IETF Working Group short name (e.g., `httpbis`).
-- `--destination`: Folder to populate with group records (NOTE: contents will be deleted on each run).
 - `--github`: GitHub org/repo for issues (can be specified multiple times).
 - `--github-label`: Include only GitHub issues with this label (can be specified multiple times).
 - `--exclude-github-label`: Exclude GitHub issues with this label (can be specified multiple times).
 - `--months`: Number of months of mailing list history to fetch (default: 12).
+- `--clear-config`: Clear and reset the persisted configuration for this Working Group.
+
+Output control:
+- `--destination`: Folder to populate with group records.
 - `--create`: See "NotebookLM Export" below.
-- `--clear-config`: Clear the persisted configuration for this Working Group.
 - `--clear-cache`: Clear the local file cache and re-download everything from scratch.
+- `--update`: Only write updated files to destination. NOTE: the destination folder is emptied when using this flag.
 
 General options:
 - `--quiet`: No messages except for errors and the final resource summary.
@@ -61,7 +66,7 @@ General options:
 
 ### Default Behavior
 
-- **Selective Mirroring**: The `--destination` folder is cleared at the start of each run. It is then populated **only** with files that were updated or newly created in the local cache during that run.
+- **Mirroring Strategy**: By default, the `--destination` folder is updated with the latest versions of all files from the local cache. If `--update` is used, only files that have changed during the current run will be written there.
 - **File Caching**: All documents are collected in `~/.cache/ietf-notebook/[wg]/files/` to avoid redundant downloads.
 - **Charters, Meetings, and Documents**: Existing files in the cache are skipped unless `--clear-cache` is used.
 - **Mailing List Discovery**: The tool automatically finds the mailing list for the WG from the Datatracker.

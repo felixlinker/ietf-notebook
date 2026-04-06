@@ -225,6 +225,11 @@ def main() -> None:
         action="store_true",
         help="Clear the local file cache for this Working Group and start fresh.",
     )
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Only write updated files to destination.",
+    )
 
     args = parser.parse_args()
 
@@ -237,10 +242,8 @@ def main() -> None:
         print(f"Usage: ietf-notebook {args.wg} --destination ./my-docs")
         return
 
-    # 1. Clear destination folder to ensure it only contains this run's updates
-    if os.path.exists(args.destination):
-        shutil.rmtree(args.destination)
-    os.makedirs(args.destination)
+    # 1. Ensure destination folder exists
+    os.makedirs(args.destination, exist_ok=True)
 
     # 1. Handle --clear-cache
     wg_cache_dir = os.path.join(get_cache_dir(), args.wg)
@@ -343,6 +346,11 @@ def main() -> None:
         dst = os.path.join(args.destination, filename)
         if copy_if_updated(src, dst):
             updated_files.append(dst)
+        elif args.update:
+            # If --update is specified, we want ONLY changed files.
+            # So if it's the same, it's not "newly changed", so remove it from destination.
+            if os.path.exists(dst):
+                os.remove(dst)
 
     if args.create:
         export_to_notebooklm(args, cache_dir, verbosity)
