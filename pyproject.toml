@@ -6,13 +6,14 @@ authors = [
 ]
 description = "Gather resources for an IETF Working Group for use in NotebookLM"
 readme = "README.md"
-requires-python = ">=3.9"
-license = {file = "LICENSE.md"}
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE.md"]
 classifiers = [
     "Operating System :: OS Independent",
-    "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: MIT License"
+    "Development Status :: 4 - Beta"
 ]
+
 dependencies = [
     "requests",
     "beautifulsoup4",
@@ -54,6 +55,8 @@ version = {attr = "ietf_notebook.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["ietf_notebook", "ietf_notebook.*"]
+namespaces = false
 
 [tool.setuptools]
 include-package-data = true
