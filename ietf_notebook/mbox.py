@@ -70,7 +70,7 @@ def clean_email_text(text: str) -> str:
 
     drop = True
     for line in lines:
-        if line.startswith(">") and drop:
+        if (line == "" or line.startswith(">")) and drop:
             continue
         else:
             drop = False
