@@ -65,45 +65,16 @@ def clean_email_text(text: str) -> str:
     text = html.unescape(text)
 
     lines = text.splitlines()
+    lines.reverse()
     cleaned_lines = []
 
-    # Common signature starts (case-insensitive)
-    sig_patterns = [
-        re.compile(r"^(Best\s+|Kind\s+|Warm\s+)?Regards,?.*$", re.I),
-        re.compile(
-            r"^Sent\s+from\s+my\s+.*(iPhone|iPad|iPod|BlackBerry|Android|mobile|"
-            r"mobile\s+device).*$",
-            re.I,
-        ),
-        re.compile(r"^--\s*$"),
-        re.compile(r"^-{3,}.*$"),
-        re.compile(r"^_{3,}.*$"),
-        re.compile(r"^=+\s*$"),
-    ]
-
+    drop = True
     for line in lines:
-        stripped_line = line.strip()
-
-        # Check for standard and common signature separators
-        match_found = False
-        for pattern in sig_patterns:
-            if pattern.match(stripped_line):
-                # Special case for 'Regards': only strip if it's a short line
-                # (to avoid false positives with "Regards to...")
-                if "regards" in stripped_line.lower():
-                    if len(stripped_line) < 40:
-                        match_found = True
-                else:
-                    match_found = True
-                break
-
-        if match_found:
-            break
-
-        if line.lstrip().startswith(">"):
+        if line.startswith(">") and drop:
             continue
-
-        cleaned_lines.append(line)
+        else:
+            drop = False
+            cleaned_lines.insert(0, line.strip())
 
     return "\n".join(cleaned_lines).strip()
 
